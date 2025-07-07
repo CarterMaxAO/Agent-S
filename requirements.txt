@@ -16,6 +16,8 @@ toml
 black
 pytesseract
 google-genai
+gui-agents
+python-dotenv
 
 # Platform-specific dependencies
 pyobjc; platform_system == "Darwin"
