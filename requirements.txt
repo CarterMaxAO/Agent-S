@@ -18,6 +18,7 @@ pytesseract
 google-genai
 gui-agents
 python-dotenv
+pynput
 
 # Platform-specific dependencies
 pyobjc; platform_system == "Darwin"

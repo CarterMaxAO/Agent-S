@@ -28,7 +28,7 @@ class Manager(BaseModule):
         engine_params: Dict,
         grounding_agent: ACI,
         local_kb_path: str,
-        embedding_engine=OpenAIEmbeddingEngine(),
+        embedding_engine=None,
         search_engine: Optional[str] = None,
         multi_round: bool = False,
         platform: str = platform.system().lower(),
@@ -57,7 +57,7 @@ class Manager(BaseModule):
 
         self.local_kb_path = local_kb_path
 
-        self.embedding_engine = embedding_engine
+        self.embedding_engine = embedding_engine or OpenAIEmbeddingEngine()
         self.knowledge_base = KnowledgeBase(
             embedding_engine=self.embedding_engine,
             local_kb_path=self.local_kb_path,
@@ -163,6 +163,7 @@ class Manager(BaseModule):
             if integrated_knowledge:
                 instruction += f"\nYou may refer to some retrieved knowledge if you think they are useful.{integrated_knowledge}"
 
+            # System prompt, so PERMANENT instruction over entire task 
             self.generator_agent.add_system_prompt(
                 self.generator_agent.system_prompt.replace(
                     "TASK_DESCRIPTION", instruction
@@ -188,6 +189,7 @@ class Manager(BaseModule):
 
         logger.info("GENERATOR MESSAGE: %s", generator_message)
 
+        # Message prompt, so defined for this single prompt
         self.generator_agent.add_message(
             generator_message,
             image_content=observation.get("screenshot", None),
@@ -310,10 +312,10 @@ class Manager(BaseModule):
             remaining_subtasks_list,
         )
 
-        # Generate the DAG
+        # Generate the DAG (Directed Acyclic Graph (dependencies for steps in process))
         dag_info, dag = self._generate_dag(instruction, plan)
 
-        # Topological sort of the DAG
+        # Topological sort of the DAG (decides what order to run the subtasks)
         action_queue = self._topological_sort(dag)
 
         planner_info.update(dag_info)

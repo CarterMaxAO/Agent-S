@@ -181,10 +181,13 @@ class OSWorldACI(ACI):
         self.coords2 = None
 
         # Configure the visual grounding model responsible for coordinate generation
-        self.grounding_model = LMMAgent(engine_params_for_grounding)
+        self.grounding_model = LMMAgent(engine_params_for_grounding)  # sets LLM engine provider (& api connections), message handling and generation. Grounding = screen observation
         self.engine_params_for_grounding = engine_params_for_grounding
 
         # Configure text grounding agent
+        # This agent finds the text id in the ocr_table using the prompt, table and screenshot
+        # "Your task is to process a phrase of text, and identify the most relevant word on the computer screen.
+        # You are provided with a phrase, a table with all the text on the screen, and a screenshot of the computer screen."
         self.text_span_agent = LMMAgent(
             engine_params=engine_params_for_generation,
             system_prompt=PROCEDURAL_MEMORY.PHRASE_TO_WORD_COORDS_PROMPT,
@@ -193,7 +196,7 @@ class OSWorldACI(ACI):
     # Given the state and worker's referring expression, use the grounding model to generate (x,y)
     def generate_coords(self, ref_expr: str, obs: Dict) -> List[int]:
 
-        # Reset the grounding model state
+        # Reset the grounding model state (delete the chat history)
         self.grounding_model.reset()
 
         # Configure the context, UI-TARS demo does not use system prompt
@@ -210,6 +213,8 @@ class OSWorldACI(ACI):
         return [int(numericals[0]), int(numericals[1])]
 
     # Calls pytesseract to generate word level bounding boxes for text grounding
+    # Uses an LLM on the ocr_table to identify the right id to use (i.e. "find the submit button", will look for an id with text akin or the same as "submit" (e.g. "confirm"))
+    # Then uses that id to retreive more complex metadata from the page
     def get_ocr_elements(self, b64_image_data: str) -> Tuple[str, List]:
         image = Image.open(BytesIO(b64_image_data))
         image_data = pytesseract.image_to_data(image, output_type=Output.DICT)
@@ -293,6 +298,16 @@ class OSWorldACI(ACI):
     # Takes a description based action and assigns the coordinates for any coordinate based action
     # Raises an error if function can't be parsed
     def assign_coordinates(self, plan: str, obs: Dict):
+        """
+        1. Worker agent returns the plan for this substep, which involves:
+         - Previous action verification
+         - Screenshot Analysis
+         - Next Action
+         - Grounded Action (i.e. agent.type(text="Hello World!"))
+        2. the "action" below parses this plan and grabs the python function, then the "function_name" and the "args" 
+        extract the infromation from that (i.e. agent.type and any description or positional args (none in eg above))
+        3. Use description to generate coords on screen 
+        """
 
         # Reset coords from previous action generation
         self.coords1, self.coords2 = None, None

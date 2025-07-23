@@ -205,6 +205,11 @@ class AgentS2(UIAgent):
         self.step_count = 0
 
     def predict(self, instruction: str, observation: Dict) -> Tuple[Dict, List[str]]:
+        """
+        This method takes in the user's query. 
+        - If a plan is required it plans it first.
+
+        """
         # Initialize the three info dictionaries
         planner_info = {}
         executor_info = {}
@@ -216,7 +221,8 @@ class AgentS2(UIAgent):
         }
         actions = []
 
-        # If the DONE response by the executor is for a subtask, then the agent should continue with the next subtask without sending the action to the environment
+        # If the DONE response by the executor is for a subtask, then the agent should continue 
+        # with the next subtask without sending the action to the environment
         while not self.should_send_action:
             self.subtask_status = "In"
             # If replan is true, generate a new plan. True at start, after a failed plan, or after subtask completion

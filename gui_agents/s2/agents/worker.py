@@ -27,7 +27,7 @@ class Worker(BaseModule):
         engine_params: Dict,
         grounding_agent: ACI,
         local_kb_path: str,
-        embedding_engine=OpenAIEmbeddingEngine(),
+        embedding_engine=None,
         platform: str = platform.system().lower(),
         enable_reflection: bool = True,
         use_subtask_experience: bool = True,
@@ -52,7 +52,7 @@ class Worker(BaseModule):
 
         self.grounding_agent = grounding_agent
         self.local_kb_path = local_kb_path
-        self.embedding_engine = embedding_engine
+        self.embedding_engine = embedding_engine or OpenAIEmbeddingEngine()
         self.enable_reflection = enable_reflection
         self.use_subtask_experience = use_subtask_experience
         self.reset()
@@ -108,6 +108,7 @@ class Worker(BaseModule):
     ) -> Tuple[Dict, List]:
         """
         Predict the next action(s) based on the current observation.
+        1. 
         """
         # Provide the top_app to the Grounding Agent to remove all other applications from the tree. At t=0, top_app is None
         agent = self.grounding_agent
@@ -220,7 +221,7 @@ class Worker(BaseModule):
 
         # Use the DescriptionBasedACI to convert agent_action("desc") into agent_action([x, y])
         try:
-            agent.assign_coordinates(plan, obs)
+            agent.assign_coordinates(plan, obs)  # assigns coords to coords1 and coords2
             plan_code = parse_single_code_from_string(plan.split("Grounded Action")[-1])
             plan_code = sanitize_code(plan_code)
             plan_code = extract_first_agent_function(plan_code)

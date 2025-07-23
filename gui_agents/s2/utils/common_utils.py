@@ -12,11 +12,15 @@ import pickle
 
 
 class Node(BaseModel):
+    """This node element is for a specific subtask. It will specify what"""
     name: str
     info: str
 
 
 class Dag(BaseModel):
+    """Directed Acyclic Graph:
+    Nodes are a sequence of steps, while edges are dependencies 
+    (meaning steps that must be taken before said step can be run)"""
     nodes: List[Node]
     edges: List[List[Node]]
 

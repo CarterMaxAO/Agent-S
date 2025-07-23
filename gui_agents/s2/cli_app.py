@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import argparse
 import datetime
 import io
@@ -12,6 +15,8 @@ from PIL import Image
 
 from gui_agents.s2.agents.grounding import OSWorldACI
 from gui_agents.s2.agents.agent_s import AgentS2
+
+
 
 current_platform = platform.system().lower()
 
@@ -84,7 +89,7 @@ def run_agent(agent, instruction: str, scaled_width: int, scaled_height: int):
     obs = {}
     traj = "Task:\n" + instruction
     subtask_traj = ""
-    for _ in range(15):
+    for _ in range(15): # 15 steps MAX
         # Get screen shot using pyautogui
         screenshot = pyautogui.screenshot()
         screenshot = screenshot.resize((scaled_width, scaled_height), Image.LANCZOS)
@@ -101,6 +106,7 @@ def run_agent(agent, instruction: str, scaled_width: int, scaled_height: int):
         # Get next action code from the agent
         info, code = agent.predict(instruction=instruction, observation=obs)
 
+        # if next action is done or fail then break out
         if "done" in code[0].lower() or "fail" in code[0].lower():
             if platform.system() == "Darwin":
                 os.system(
@@ -144,19 +150,19 @@ def main():
     parser.add_argument(
         "--provider",
         type=str,
-        default="anthropic",
+        default="azure",
         help="Specify the provider to use (e.g., openai, anthropic, etc.)",
     )
     parser.add_argument(
         "--model",
         type=str,
-        default="claude-3-7-sonnet-20250219",
+        default="gpt-4o",
         help="Specify the model to use (e.g., gpt-4o)",
     )
     parser.add_argument(
         "--model_url",
         type=str,
-        default="",
+        default="https://mc-leading-intel.openai.azure.com/",
         help="The URL of the main generation model API.",
     )
     parser.add_argument(
@@ -165,18 +171,24 @@ def main():
         default="",
         help="The API key of the main generation model.",
     )
+    parser.add_argument(
+        "--model_api_version",
+        type=str,
+        default="2024-12-01-preview",
+        help="API version to use for Azure OpenAI",
+    )
 
     # Grounding model config option 1: API based
     parser.add_argument(
         "--grounding_model_provider",
         type=str,
-        default="anthropic",
+        default="azure",
         help="Specify the provider to use for the grounding model (e.g., openai, anthropic, etc.)",
     )
     parser.add_argument(
         "--grounding_model",
         type=str,
-        default="claude-3-7-sonnet-20250219",
+        default="gpt-4o",
         help="Specify the grounding model to use (e.g., claude-3-5-sonnet-20241022)",
     )
     parser.add_argument(
@@ -215,7 +227,7 @@ def main():
     parser.add_argument(
         "--embedding_engine_type",
         type=str,
-        default="openai",
+        default="azure",
         help="Specify the embedding engine type (supports openai, gemini)",
     )
 
@@ -236,6 +248,7 @@ def main():
         "model": args.model,
         "base_url": args.model_url,
         "api_key": args.model_api_key,
+        "api_version": args.model_api_version,
     }
 
     # Load the grounding engine from a HuggingFace TGI endpoint
@@ -244,6 +257,7 @@ def main():
             "engine_type": args.endpoint_provider,
             "base_url": args.endpoint_url,
             "api_key": args.endpoint_api_key,
+            "api_version": args.model_api_version,
         }
     else:
         grounding_height = args.grounding_model_resize_height
@@ -258,8 +272,10 @@ def main():
             "model": args.grounding_model,
             "grounding_width": args.grounding_model_resize_width,
             "grounding_height": grounding_height,
+            "api_version": args.model_api_version,
         }
 
+    # Assigns coordinates and describes actions that the agent can take (type, click, drag and drop etc)
     grounding_agent = OSWorldACI(
         platform=current_platform,
         engine_params_for_generation=engine_params,
@@ -268,6 +284,14 @@ def main():
         height=screen_height,
     )
 
+    embedding_engine_params = {
+        "embedding_model": "text-embedding-3-small",
+        "endpoint_url": args.model_url,
+        "api_key": args.model_api_key,
+        "api_version": args.model_api_version,
+    }
+
+    # plans/executes actions and stores memories
     agent = AgentS2(
         engine_params,
         grounding_agent,
@@ -276,14 +300,17 @@ def main():
         observation_type="mixed",
         search_engine=None,
         embedding_engine_type=args.embedding_engine_type,
+        embedding_engine_params=embedding_engine_params
     )
 
     while True:
         query = input("Query: ")
 
+        # clears input/subtasks
         agent.reset()
 
-        # Run the agent on your own device
+        # Run the agent on your own device, doing all the loops for each subtask.
+        # Theres a predict function in there that returns the next action, and is repeated max 15 times
         run_agent(agent, query, scaled_width, scaled_height)
 
         response = input("Would you like to provide another query? (y/n): ")
